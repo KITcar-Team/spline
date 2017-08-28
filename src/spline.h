@@ -43,9 +43,8 @@ private:
     std::vector< std::vector<double> > m_upper;  // upper band
     std::vector< std::vector<double> > m_lower;  // lower band
 public:
-    inline band_matrix() {};                             // constructor
+    inline band_matrix() = default;                             // constructor
     inline band_matrix(int dim, int n_u, int n_l);       // constructor
-    inline ~band_matrix() {};                            // destructor
     inline void resize(int dim, int n_u, int n_l);      // init with dim,n_u,n_l
     inline int dim() const;                             // matrix dimension
     inline int num_upper() const
@@ -86,18 +85,12 @@ private:
     // f(x) = a*(x-x_i)^3 + b*(x-x_i)^2 + c*(x-x_i) + y_i
     std::vector<double> m_a,m_b,m_c;        // spline coefficients
     double  m_b0, m_c0;                     // for left extrapol
-    bd_type m_left, m_right;
-    double  m_left_value, m_right_value;
-    bool    m_force_linear_extrapolation;
+    bd_type m_left = second_deriv, m_right = second_deriv;
+    double  m_left_value = 0.0, m_right_value = 0.0;
+    bool    m_force_linear_extrapolation = false;
 
 public:
-    // set default boundary condition to be zero curvature at both ends
-    inline spline(): m_left(second_deriv), m_right(second_deriv),
-        m_left_value(0.0), m_right_value(0.0),
-        m_force_linear_extrapolation(false)
-    {
-        ;
-    }
+    inline spline() = default;
 
     // optional, but if called it has to come be before set_points()
     inline void set_boundary(bd_type left, double left_value,
