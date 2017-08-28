@@ -92,7 +92,7 @@ public:
 
 private:
     // find the closest point m_x[idx] < x, idx=0 even if x<m_x[0]
-    std::size_t closest_idx_to(double x) const;
+    inline std::size_t closest_idx_to(double x) const;
 
     std::vector<double> m_x,m_y;            // x,y coordinates of points
     // interpolation parameters
