@@ -69,6 +69,17 @@ public:
 
 };
 
+enum class spline_type {
+    linear = 1,
+    cubic = 3,
+    dflt = cubic
+};
+
+enum class extrapolation_method {
+   linear = 1,
+   quadratic = 2,
+   dflt = quadratic
+};
 
 // spline interpolation
 class spline
@@ -92,17 +103,12 @@ private:
 public:
     inline spline() = default;
     inline spline(std::vector<double> xs, std::vector<double> ys,
-                  bool cubic_spline = true,
+                  spline_type type = spline_type::dflt,
+                  extrapolation_method extrapolation = extrapolation_method::dflt,
                   bd_type left = second_deriv, double left_value = 0.0,
-                  bd_type right = second_deriv, double right_value = 0.0,
-                  bool force_linear_extrapolation=false);
+                  bd_type right = second_deriv, double right_value = 0.0);
 
     // optional, but if called it has to come be before set_points()
-    inline void set_boundary(bd_type left, double left_value,
-                      bd_type right, double right_value,
-                      bool force_linear_extrapolation=false);
-    inline void set_points(const std::vector<double>& x,
-                    const std::vector<double>& y, bool cubic_spline=true);
     inline double operator() (double x) const;
     inline double deriv(int order, double x) const;
 };
@@ -261,10 +267,10 @@ std::vector<double> band_matrix::lu_solve(const std::vector<double>& b,
 // -----------------------
 
 inline spline::spline(std::vector<double> xs, std::vector<double> ys,
-                  bool cubic_spline,
+                  spline_type type,
+                  extrapolation_method extrapolation,
                   bd_type left, double left_value,
-                  bd_type right, double right_value,
-                  bool force_linear_extrapolation)
+                  bd_type right, double right_value)
         : m_x(std::move(xs)), m_y(std::move(ys)) {
     int n=m_x.size();
     // TODO: maybe sort x and y, rather than returning an error
@@ -272,7 +278,7 @@ inline spline::spline(std::vector<double> xs, std::vector<double> ys,
         assert(m_x[i]<m_x[i+1]);
     }
 
-    if(cubic_spline==true) { // cubic spline interpolation
+    if(type==spline_type::cubic) { // cubic spline interpolation
         // setting up the matrix and right hand side of the equation system
         // for the parameters b[]
         band_matrix A(n,1,1);
@@ -337,7 +343,7 @@ inline spline::spline(std::vector<double> xs, std::vector<double> ys,
     }
 
     // for left extrapolation coefficients
-    m_b0 = (force_linear_extrapolation==false) ? m_b[0] : 0.0;
+    m_b0 = (extrapolation==extrapolation_method::linear) ? m_b[0] : 0.0;
     m_c0 = m_c[0];
 
     // for the right extrapolation coefficients
@@ -346,7 +352,7 @@ inline spline::spline(std::vector<double> xs, std::vector<double> ys,
     // m_b[n-1] is determined by the boundary condition
     m_a[n-1]=0.0;
     m_c[n-1]=3.0*m_a[n-2]*h*h+2.0*m_b[n-2]*h+m_c[n-2];   // = f'_{n-2}(x_{n-1})
-    if(force_linear_extrapolation==true)
+    if(extrapolation==extrapolation_method::linear)
         m_b[n-1]=0.0;
 
 }
