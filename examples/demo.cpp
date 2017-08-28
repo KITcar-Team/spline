@@ -18,8 +18,7 @@ int main(int argc, char** argv)
     Y[3]=1.1;
     Y[4]=0.9;
 
-    tk::spline s;
-    s.set_points(X,Y);    // currently it is required that X is already sorted
+    tk::spline s(X, Y);
 
     double x=1.5;
 

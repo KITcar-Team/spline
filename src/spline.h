@@ -88,12 +88,14 @@ private:
     // f(x) = a*(x-x_i)^3 + b*(x-x_i)^2 + c*(x-x_i) + y_i
     std::vector<double> m_a,m_b,m_c;        // spline coefficients
     double  m_b0, m_c0;                     // for left extrapol
-    bd_type m_left = second_deriv, m_right = second_deriv;
-    double  m_left_value = 0.0, m_right_value = 0.0;
-    bool    m_force_linear_extrapolation = false;
 
 public:
     inline spline() = default;
+    inline spline(std::vector<double> xs, std::vector<double> ys,
+                  bool cubic_spline = true,
+                  bd_type left = second_deriv, double left_value = 0.0,
+                  bd_type right = second_deriv, double right_value = 0.0,
+                  bool force_linear_extrapolation=false);
 
     // optional, but if called it has to come be before set_points()
     inline void set_boundary(bd_type left, double left_value,
@@ -255,32 +257,16 @@ std::vector<double> band_matrix::lu_solve(const std::vector<double>& b,
 }
 
 
-
-
 // spline implementation
 // -----------------------
 
-void spline::set_boundary(spline::bd_type left, double left_value,
-                          spline::bd_type right, double right_value,
-                          bool force_linear_extrapolation)
-{
-    assert(m_x.size()==0);          // set_points() must not have happened yet
-    m_left=left;
-    m_right=right;
-    m_left_value=left_value;
-    m_right_value=right_value;
-    m_force_linear_extrapolation=force_linear_extrapolation;
-}
-
-
-void spline::set_points(const std::vector<double>& x,
-                        const std::vector<double>& y, bool cubic_spline)
-{
-    assert(x.size()==y.size());
-    assert(x.size()>2);
-    m_x=x;
-    m_y=y;
-    int   n=x.size();
+inline spline::spline(std::vector<double> xs, std::vector<double> ys,
+                  bool cubic_spline,
+                  bd_type left, double left_value,
+                  bd_type right, double right_value,
+                  bool force_linear_extrapolation)
+        : m_x(std::move(xs)), m_y(std::move(ys)) {
+    int n=m_x.size();
     // TODO: maybe sort x and y, rather than returning an error
     for(int i=0; i<n-1; i++) {
         assert(m_x[i]<m_x[i+1]);
@@ -292,38 +278,38 @@ void spline::set_points(const std::vector<double>& x,
         band_matrix A(n,1,1);
         std::vector<double>  rhs(n);
         for(int i=1; i<n-1; i++) {
-            A(i,i-1)=1.0/3.0*(x[i]-x[i-1]);
-            A(i,i)=2.0/3.0*(x[i+1]-x[i-1]);
-            A(i,i+1)=1.0/3.0*(x[i+1]-x[i]);
-            rhs[i]=(y[i+1]-y[i])/(x[i+1]-x[i]) - (y[i]-y[i-1])/(x[i]-x[i-1]);
+            A(i,i-1)=1.0/3.0*(m_x[i]-m_x[i-1]);
+            A(i,i)=2.0/3.0*(m_x[i+1]-m_x[i-1]);
+            A(i,i+1)=1.0/3.0*(m_x[i+1]-m_x[i]);
+            rhs[i]=(m_y[i+1]-m_y[i])/(m_x[i+1]-m_x[i]) - (m_y[i]-m_y[i-1])/(m_x[i]-m_x[i-1]);
         }
         // boundary conditions
-        if(m_left == spline::second_deriv) {
+        if(left == spline::second_deriv) {
             // 2*b[0] = f''
             A(0,0)=2.0;
             A(0,1)=0.0;
-            rhs[0]=m_left_value;
-        } else if(m_left == spline::first_deriv) {
+            rhs[0]=left_value;
+        } else if(left == spline::first_deriv) {
             // c[0] = f', needs to be re-expressed in terms of b:
-            // (2b[0]+b[1])(x[1]-x[0]) = 3 ((y[1]-y[0])/(x[1]-x[0]) - f')
-            A(0,0)=2.0*(x[1]-x[0]);
-            A(0,1)=1.0*(x[1]-x[0]);
-            rhs[0]=3.0*((y[1]-y[0])/(x[1]-x[0])-m_left_value);
+            // (2b[0]+b[1])(m_x[1]-m_x[0]) = 3 ((m_y[1]-m_y[0])/(m_x[1]-m_x[0]) - f')
+            A(0,0)=2.0*(m_x[1]-m_x[0]);
+            A(0,1)=1.0*(m_x[1]-m_x[0]);
+            rhs[0]=3.0*((m_y[1]-m_y[0])/(m_x[1]-m_x[0])-left_value);
         } else {
             assert(false);
         }
-        if(m_right == spline::second_deriv) {
+        if(right == spline::second_deriv) {
             // 2*b[n-1] = f''
             A(n-1,n-1)=2.0;
             A(n-1,n-2)=0.0;
-            rhs[n-1]=m_right_value;
-        } else if(m_right == spline::first_deriv) {
+            rhs[n-1]=right_value;
+        } else if(right == spline::first_deriv) {
             // c[n-1] = f', needs to be re-expressed in terms of b:
             // (b[n-2]+2b[n-1])(x[n-1]-x[n-2])
             // = 3 (f' - (y[n-1]-y[n-2])/(x[n-1]-x[n-2]))
-            A(n-1,n-1)=2.0*(x[n-1]-x[n-2]);
-            A(n-1,n-2)=1.0*(x[n-1]-x[n-2]);
-            rhs[n-1]=3.0*(m_right_value-(y[n-1]-y[n-2])/(x[n-1]-x[n-2]));
+            A(n-1,n-1)=2.0*(m_x[n-1]-m_x[n-2]);
+            A(n-1,n-2)=1.0*(m_x[n-1]-m_x[n-2]);
+            rhs[n-1]=3.0*(right_value-(m_y[n-1]-m_y[n-2])/(m_x[n-1]-m_x[n-2]));
         } else {
             assert(false);
         }
@@ -335,9 +321,9 @@ void spline::set_points(const std::vector<double>& x,
         m_a.resize(n);
         m_c.resize(n);
         for(int i=0; i<n-1; i++) {
-            m_a[i]=1.0/3.0*(m_b[i+1]-m_b[i])/(x[i+1]-x[i]);
-            m_c[i]=(y[i+1]-y[i])/(x[i+1]-x[i])
-                   - 1.0/3.0*(2.0*m_b[i]+m_b[i+1])*(x[i+1]-x[i]);
+            m_a[i]=1.0/3.0*(m_b[i+1]-m_b[i])/(m_x[i+1]-m_x[i]);
+            m_c[i]=(m_y[i+1]-m_y[i])/(m_x[i+1]-m_x[i])
+                   - 1.0/3.0*(2.0*m_b[i]+m_b[i+1])*(m_x[i+1]-m_x[i]);
         }
     } else { // linear interpolation
         m_a.resize(n);
@@ -351,17 +337,18 @@ void spline::set_points(const std::vector<double>& x,
     }
 
     // for left extrapolation coefficients
-    m_b0 = (m_force_linear_extrapolation==false) ? m_b[0] : 0.0;
+    m_b0 = (force_linear_extrapolation==false) ? m_b[0] : 0.0;
     m_c0 = m_c[0];
 
     // for the right extrapolation coefficients
     // f_{n-1}(x) = b*(x-x_{n-1})^2 + c*(x-x_{n-1}) + y_{n-1}
-    double h=x[n-1]-x[n-2];
+    double h=m_x[n-1]-m_x[n-2];
     // m_b[n-1] is determined by the boundary condition
     m_a[n-1]=0.0;
     m_c[n-1]=3.0*m_a[n-2]*h*h+2.0*m_b[n-2]*h+m_c[n-2];   // = f'_{n-2}(x_{n-1})
-    if(m_force_linear_extrapolation==true)
+    if(force_linear_extrapolation==true)
         m_b[n-1]=0.0;
+
 }
 
 std::size_t spline::closest_idx_to(double x) const {
