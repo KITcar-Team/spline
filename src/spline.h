@@ -80,6 +80,9 @@ public:
     };
 
 private:
+    // find the closest point m_x[idx] < x, idx=0 even if x<m_x[0]
+    std::size_t closest_idx_to(double x) const;
+
     std::vector<double> m_x,m_y;            // x,y coordinates of points
     // interpolation parameters
     // f(x) = a*(x-x_i)^3 + b*(x-x_i)^2 + c*(x-x_i) + y_i
@@ -361,15 +364,17 @@ void spline::set_points(const std::vector<double>& x,
         m_b[n-1]=0.0;
 }
 
+std::size_t spline::closest_idx_to(double x) const {
+  const auto it=std::lower_bound(m_x.begin(),m_x.end(),x);
+  std::size_t idx=std::distance(m_x.begin(),it);
+  return idx == 0 ? 0 : idx - 1;
+}
+
 double spline::operator() (double x) const
 {
-    size_t n=m_x.size();
-    // find the closest point m_x[idx] < x, idx=0 even if x<m_x[0]
-    std::vector<double>::const_iterator it;
-    it=std::lower_bound(m_x.begin(),m_x.end(),x);
-    int idx=std::max( int(it-m_x.begin())-1, 0);
-
-    double h=x-m_x[idx];
+    const size_t n=m_x.size();
+    const std::size_t idx = closest_idx_to(x);
+    const double h=x-m_x[idx];
     double interpol;
     if(x<m_x[0]) {
         // extrapolation to the left
@@ -388,13 +393,9 @@ double spline::deriv(int order, double x) const
 {
     assert(order>0);
 
-    size_t n=m_x.size();
-    // find the closest point m_x[idx] < x, idx=0 even if x<m_x[0]
-    std::vector<double>::const_iterator it;
-    it=std::lower_bound(m_x.begin(),m_x.end(),x);
-    int idx=std::max( int(it-m_x.begin())-1, 0);
-
-    double h=x-m_x[idx];
+    const size_t n=m_x.size();
+    const std::size_t idx = closest_idx_to(x);
+    const double h=x-m_x[idx];
     double interpol;
     if(x<m_x[0]) {
         // extrapolation to the left
